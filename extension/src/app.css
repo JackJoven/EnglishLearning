@@ -305,6 +305,10 @@ textarea {
 }
 
 .danger {
+  border-color: #c2410c;
   color: #9a3412;
 }
 
+.danger:hover {
+  background: #fff7ed;
+}

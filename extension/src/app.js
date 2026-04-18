@@ -55,6 +55,7 @@
   const exportData = document.querySelector("#exportData");
   const exportOutput = document.querySelector("#exportOutput");
   const clearIgnored = document.querySelector("#clearIgnored");
+  const resetData = document.querySelector("#resetData");
   const settingsStatus = document.querySelector("#settingsStatus");
 
   initialize();
@@ -153,6 +154,25 @@
       state.ignoredIds = [];
       await chrome.storage.local.set({ aelIgnoredIds: [] });
       showSettingsStatus("已清空忽略词。");
+    });
+
+    resetData.addEventListener("click", async () => {
+      const confirmed = window.confirm("确定要清空生词、复习记录、忽略词和替换统计吗？这个操作不可恢复。");
+      if (!confirmed) return;
+
+      state.vocabulary = {};
+      state.ignoredIds = [];
+      state.reviewRecords = [];
+      await chrome.storage.local.remove([
+        "aelVocabulary",
+        "aelIgnoredIds",
+        "aelReviewRecords",
+        "aelExposureCounts",
+        "aelHoverCounts",
+        "aelReplacementEvents"
+      ]);
+      renderAll();
+      showSettingsStatus("学习数据已清空。");
     });
   }
 
@@ -503,4 +523,3 @@
       .replace(/'/g, "&#039;");
   }
 })();
-
