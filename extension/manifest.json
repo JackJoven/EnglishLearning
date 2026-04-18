@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "AI English Learning MVP",
+  "description": "Learn English naturally through lightweight contextual replacements on web pages.",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "storage"],
+  "host_permissions": ["<all_urls>"],
+  "action": {
+    "default_title": "AI English Learning",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/dictionary.js", "src/content.js"],
+      "css": ["src/content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
+

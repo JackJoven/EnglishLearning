@@ -1,0 +1,153 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 320px;
+  margin: 0;
+  background: #f6f8fa;
+  color: #151b23;
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+}
+
+.popup {
+  padding: 14px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 18px;
+}
+
+p {
+  margin: 5px 0 0;
+  color: #58606d;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.switch {
+  flex: 0 0 auto;
+  position: relative;
+  width: 42px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch span {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: #9aa4b2;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.switch span::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  border-radius: 7px;
+  background: #ffffff;
+  transition: transform 0.16s ease;
+}
+
+.switch input:checked + span {
+  background: #0f766e;
+}
+
+.switch input:checked + span::before {
+  transform: translateX(18px);
+}
+
+.field {
+  margin-top: 12px;
+}
+
+label {
+  display: block;
+  margin-bottom: 6px;
+  color: #394150;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #c9d1d9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #151b23;
+  font: inherit;
+  padding: 6px 8px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.stats div {
+  border: 1px solid #d8dee4;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+}
+
+.stats strong {
+  display: block;
+  font-size: 20px;
+}
+
+.stats span {
+  color: #58606d;
+  font-size: 12px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+button {
+  min-height: 34px;
+  border: 1px solid #0f766e;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f766e;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+
+button:hover {
+  background: #e6f4f1;
+}
+
+.status {
+  min-height: 18px;
+  margin-top: 10px;
+  color: #0f766e;
+}
+

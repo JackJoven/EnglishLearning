@@ -1,0 +1,95 @@
+.ael-replacement {
+  border-bottom: 1px dotted #0f766e;
+  color: #0f766e;
+  cursor: help;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ael-replacement[data-ael-direction="en-to-zh"] {
+  color: #8a4b0f;
+  border-bottom-color: #8a4b0f;
+}
+
+.ael-tooltip {
+  position: fixed;
+  z-index: 2147483647;
+  width: min(320px, calc(100vw - 24px));
+  padding: 12px;
+  border: 1px solid rgba(18, 24, 32, 0.16);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #151b23;
+  box-shadow: 0 12px 28px rgba(18, 24, 32, 0.18);
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ael-tooltip[hidden] {
+  display: none;
+}
+
+.ael-tooltip__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.ael-tooltip__term {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ael-tooltip__tag {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: #e6f4f1;
+  color: #0f766e;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.ael-tooltip__row {
+  margin: 6px 0;
+}
+
+.ael-tooltip__label {
+  color: #58606d;
+}
+
+.ael-tooltip__example {
+  margin-top: 8px;
+  padding: 8px;
+  border-left: 3px solid #0f766e;
+  background: #f6f8fa;
+}
+
+.ael-tooltip__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ael-tooltip button {
+  border: 1px solid rgba(18, 24, 32, 0.16);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #151b23;
+  cursor: pointer;
+  font: inherit;
+  padding: 5px 9px;
+}
+
+.ael-tooltip button:hover {
+  background: #f6f8fa;
+}
+
+.ael-tooltip button[data-action="save"] {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}
+

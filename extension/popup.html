@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI English Learning</title>
+    <link rel="stylesheet" href="src/popup.css">
+  </head>
+  <body>
+    <main class="popup">
+      <header class="header">
+        <div>
+          <h1>语境英语</h1>
+          <p>让网页里的词自然混进日常阅读。</p>
+        </div>
+        <label class="switch" title="开启或关闭网页替换">
+          <input id="enabled" type="checkbox">
+          <span></span>
+        </label>
+      </header>
+
+      <section class="field">
+        <label for="direction">替换方向</label>
+        <select id="direction">
+          <option value="both">双向替换</option>
+          <option value="zh-to-en">中文替换成英文</option>
+          <option value="en-to-zh">英文替换成中文</option>
+        </select>
+      </section>
+
+      <section class="field">
+        <label for="strength">替换强度</label>
+        <select id="strength">
+          <option value="low">低，每页最多 5 个</option>
+          <option value="medium">中，每页最多 10 个</option>
+          <option value="high">高，每页最多 18 个</option>
+        </select>
+      </section>
+
+      <section class="stats" aria-label="学习记录">
+        <div>
+          <strong id="savedCount">0</strong>
+          <span>已收藏</span>
+        </div>
+        <div>
+          <strong id="ignoredCount">0</strong>
+          <span>已忽略</span>
+        </div>
+      </section>
+
+      <section class="actions">
+        <button id="applyPage" type="button">重新应用本页</button>
+        <button id="restorePage" type="button">恢复本页原文</button>
+      </section>
+
+      <p id="status" class="status" role="status"></p>
+    </main>
+    <script src="src/popup.js"></script>
+  </body>
+</html>
+
