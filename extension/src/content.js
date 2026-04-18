@@ -3,7 +3,12 @@
   const DEFAULT_SETTINGS = {
     enabled: true,
     direction: "both",
-    strength: "low"
+    strength: "low",
+    disabledSites: [],
+    aiEnabled: false,
+    aiEndpoint: "https://api.openai.com/v1/chat/completions",
+    aiModel: "gpt-4o-mini",
+    apiKey: ""
   };
   const STRENGTH_LIMITS = {
     low: 5,
@@ -38,6 +43,9 @@
   let observer;
   let applying = false;
   let pagePaused = false;
+  let aiEntries = [];
+  let aiRequestInFlight = false;
+  let aiRequestedForPage = false;
 
   initialize();
 
@@ -51,8 +59,9 @@
     bindMessages();
     bindStorageChanges();
 
-    if (settings.enabled) {
+    if (isReplacementAllowed()) {
       applyReplacements();
+      requestAiReplacementSuggestions();
       observeDynamicContent();
     }
   }
@@ -88,9 +97,11 @@
 
       if (message.type === "ael-apply") {
         pagePaused = false;
+        aiRequestedForPage = false;
         restoreOriginalText();
-        if (settings.enabled) {
+        if (isReplacementAllowed()) {
           applyReplacements();
+          requestAiReplacementSuggestions();
           observeDynamicContent();
         }
         sendResponse({ ok: true });
@@ -107,10 +118,13 @@
       if (changes.aelSettings) {
         settings = { ...DEFAULT_SETTINGS, ...(changes.aelSettings.newValue || {}) };
         pagePaused = false;
+        aiRequestedForPage = false;
+        aiEntries = [];
         restoreOriginalText();
 
-        if (settings.enabled) {
+        if (isReplacementAllowed()) {
           applyReplacements();
+          requestAiReplacementSuggestions();
           observeDynamicContent();
         } else {
           stopObservingDynamicContent();
@@ -126,7 +140,7 @@
 
   function applyReplacements() {
     if (pagePaused) return;
-    if (applying || !settings.enabled || !dictionary.length) return;
+    if (applying || !isReplacementAllowed() || !getReplacementEntries().length) return;
     if (!document.body) return;
 
     applying = true;
@@ -179,12 +193,12 @@
   }
 
   function findBestMatch(text) {
-    const candidates = dictionary.filter((entry) => !ignoredIds.includes(entry.id));
+    const candidates = getReplacementEntries().filter((entry) => !ignoredIds.includes(entry.id));
     let bestMatch = null;
 
     for (const entry of candidates) {
-      const zhMatch = findZhMatch(text, entry);
-      const enMatch = findEnMatch(text, entry);
+      const zhMatch = entry.kind === "ai" ? findAiMatch(text, entry) : findZhMatch(text, entry);
+      const enMatch = entry.kind === "ai" ? null : findEnMatch(text, entry);
       const nextMatch = chooseEarlier(zhMatch, enMatch);
 
       if (!nextMatch) continue;
@@ -194,6 +208,10 @@
     }
 
     return bestMatch;
+  }
+
+  function getReplacementEntries() {
+    return [...aiEntries, ...dictionary];
   }
 
   function findZhMatch(text, entry) {
@@ -225,6 +243,28 @@
     };
   }
 
+  function findAiMatch(text, entry) {
+    if (!entry.original || !entry.replacement) return null;
+    if (settings.direction !== "both" && settings.direction !== entry.direction) return null;
+
+    const isEnglish = entry.direction === "en-to-zh";
+    const pattern = isEnglish ? new RegExp(`\\b${escapeRegExp(entry.original)}\\b`, "i") : null;
+    const match = pattern ? text.match(pattern) : null;
+    const index = pattern ? match?.index ?? -1 : text.indexOf(entry.original);
+    const matchedText = pattern && match ? match[0] : entry.original;
+
+    if (index === -1) return null;
+
+    return {
+      entry,
+      index,
+      length: matchedText.length,
+      original: matchedText,
+      replacement: entry.replacement,
+      direction: entry.direction
+    };
+  }
+
   function chooseEarlier(first, second) {
     if (!first) return second;
     if (!second) return first;
@@ -252,6 +292,7 @@
     span.dataset.aelOriginal = match.original;
     span.dataset.aelReplacement = match.replacement;
     span.dataset.aelDirection = match.direction;
+    span.dataset.aelSource = match.entry.kind || "builtin";
     return span;
   }
 
@@ -287,7 +328,7 @@
   }
 
   function showTooltip(target, event) {
-    const entry = dictionary.find((item) => item.id === target.dataset.aelEntryId);
+    const entry = getReplacementEntries().find((item) => item.id === target.dataset.aelEntryId);
     if (!entry) return;
 
     cancelTooltipHide();
@@ -300,11 +341,11 @@
 
   function renderTooltip(entry, target) {
     const direction = target.dataset.aelDirection;
-    const explanation = direction === "zh-to-en" ? entry.zhExplanation : entry.enExplanation;
+    const explanation = entry.kind === "ai" ? entry.explanation : direction === "zh-to-en" ? entry.zhExplanation : entry.enExplanation;
     return `
       <div class="ael-tooltip__title">
         <span class="ael-tooltip__term">${escapeHtml(target.dataset.aelReplacement)}</span>
-        <span class="ael-tooltip__tag">${escapeHtml(entry.difficulty)}</span>
+        <span class="ael-tooltip__tag">${escapeHtml(entry.difficulty || "AI")}</span>
       </div>
       <div class="ael-tooltip__row">
         <span class="ael-tooltip__label">原文：</span>${escapeHtml(target.dataset.aelOriginal)}
@@ -372,13 +413,15 @@
     const vocabulary = stored.aelVocabulary || {};
     vocabulary[entry.id] = {
       id: entry.id,
-      zh: entry.zh,
-      en: entry.en,
-      explanation: entry.zhExplanation,
+      zh: entry.zh || (target.dataset.aelDirection === "zh-to-en" ? target.dataset.aelOriginal : target.dataset.aelReplacement),
+      en: entry.en || entry.term || (target.dataset.aelDirection === "zh-to-en" ? target.dataset.aelReplacement : target.dataset.aelOriginal),
+      explanation: entry.kind === "ai" ? entry.explanation : entry.zhExplanation,
       example: entry.example,
+      masteryStatus: vocabulary[entry.id]?.masteryStatus || "new",
       lastOriginal: target.dataset.aelOriginal,
       lastReplacement: target.dataset.aelReplacement,
       direction: target.dataset.aelDirection,
+      source: entry.kind || "builtin",
       sourceUrl: location.href,
       sourceTitle: document.title,
       savedAt: new Date().toISOString()
@@ -394,10 +437,21 @@
   }
 
   async function recordExposure(entryId) {
-    const stored = await storageGet(["aelExposureCounts"]);
+    const stored = await storageGet(["aelExposureCounts", "aelReplacementEvents"]);
     const counts = stored.aelExposureCounts || {};
     counts[entryId] = (counts[entryId] || 0) + 1;
-    await storageSet({ aelExposureCounts: counts });
+    const events = stored.aelReplacementEvents || [];
+    events.unshift({
+      id: crypto.randomUUID(),
+      entryId,
+      pageUrl: location.href,
+      pageTitle: document.title,
+      createdAt: new Date().toISOString()
+    });
+    await storageSet({
+      aelExposureCounts: counts,
+      aelReplacementEvents: events.slice(0, 200)
+    });
   }
 
   async function markHoverOpened(entryId) {
@@ -409,17 +463,125 @@
 
   function observeDynamicContent() {
     if (pagePaused) return;
+    if (!isReplacementAllowed()) return;
     if (observer || !document.body) return;
 
     observer = new MutationObserver(() => {
       window.clearTimeout(observeDynamicContent.timer);
-      observeDynamicContent.timer = window.setTimeout(applyReplacements, 300);
+      observeDynamicContent.timer = window.setTimeout(() => {
+        applyReplacements();
+        requestAiReplacementSuggestions();
+      }, 300);
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+  }
+
+  async function requestAiReplacementSuggestions() {
+    if (aiRequestInFlight || aiRequestedForPage) return;
+    if (!isReplacementAllowed() || !settings.aiEnabled || !settings.apiKey) return;
+
+    const text = collectVisibleTextSample();
+    if (text.length < 80) return;
+
+    aiRequestInFlight = true;
+    aiRequestedForPage = true;
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: "ael-ai-replacements",
+        payload: {
+          text,
+          direction: settings.direction,
+          strength: settings.strength,
+          url: location.href,
+          title: document.title
+        }
+      });
+
+      if (response?.ok && Array.isArray(response.data?.items)) {
+        aiEntries = response.data.items.map(normalizeAiEntry).filter(Boolean);
+        applyReplacements();
+      }
+    } catch (_error) {
+      aiEntries = [];
+    } finally {
+      aiRequestInFlight = false;
+    }
+  }
+
+  function normalizeAiEntry(item, index) {
+    const original = String(item.original || "").trim();
+    const replacement = String(item.replacement || "").trim();
+    const direction = item.direction === "en-to-zh" ? "en-to-zh" : item.direction === "zh-to-en" ? "zh-to-en" : "";
+
+    if (!original || !replacement || !direction) return null;
+
+    return {
+      id: `ai-${hashText(`${original}-${replacement}-${direction}`)}-${index}`,
+      kind: "ai",
+      original,
+      replacement,
+      direction,
+      zh: direction === "zh-to-en" ? original : replacement,
+      en: direction === "zh-to-en" ? replacement : original,
+      term: item.term || replacement,
+      explanation: item.explanation || "AI 根据当前网页语境推荐的替换。",
+      example: item.example || "",
+      difficulty: item.difficulty || "AI"
+    };
+  }
+
+  function collectVisibleTextSample() {
+    if (!document.body) return "";
+
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode(node) {
+          if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+          if (shouldSkipNode(node)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
+    );
+
+    const chunks = [];
+    let total = 0;
+    while (total < 3500) {
+      const node = walker.nextNode();
+      if (!node) break;
+      const text = node.nodeValue.trim().replace(/\s+/g, " ");
+      if (text.length < 12) continue;
+      chunks.push(text);
+      total += text.length;
+    }
+
+    return chunks.join("\n").slice(0, 3500);
+  }
+
+  function isReplacementAllowed() {
+    if (!settings.enabled || pagePaused) return false;
+    return !isCurrentSiteDisabled();
+  }
+
+  function isCurrentSiteDisabled() {
+    const hostname = location.hostname;
+    return (settings.disabledSites || []).some((site) => {
+      const normalized = String(site).trim().replace(/^https?:\/\//, "").split("/")[0];
+      return normalized && (hostname === normalized || hostname.endsWith(`.${normalized}`));
+    });
+  }
+
+  function hashText(value) {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+      hash = Math.imul(31, hash) + value.charCodeAt(index) | 0;
+    }
+    return Math.abs(hash).toString(36);
   }
 
   function stopObservingDynamicContent() {

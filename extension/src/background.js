@@ -107,27 +107,20 @@
 
   async function callChatJson(settings, messages, requiredKey) {
     try {
-      const response = await fetch(settings.aiEndpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${settings.apiKey}`
-        },
-        body: JSON.stringify({
-          model: settings.aiModel,
-          messages,
-          temperature: 0.2,
-          response_format: { type: "json_object" }
-        })
-      });
+      let response = await postChat(settings, messages, true);
+      let payload = await response.json().catch(() => ({}));
+
+      if (!response.ok && response.status === 400) {
+        response = await postChat(settings, messages, false);
+        payload = await response.json().catch(() => ({}));
+      }
 
       if (!response.ok) {
         return { ok: false, reason: `AI 请求失败：${response.status}` };
       }
 
-      const payload = await response.json();
       const content = payload.choices?.[0]?.message?.content || "{}";
-      const parsed = JSON.parse(content);
+      const parsed = parseJsonContent(content);
 
       if (requiredKey && parsed[requiredKey] === undefined) {
         return { ok: false, reason: "AI 返回格式不完整" };
@@ -139,9 +132,36 @@
     }
   }
 
+  function postChat(settings, messages, useJsonMode) {
+    const body = {
+      model: settings.aiModel,
+      messages,
+      temperature: 0.2
+    };
+
+    if (useJsonMode) {
+      body.response_format = { type: "json_object" };
+    }
+
+    return fetch(settings.aiEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${settings.apiKey}`
+        },
+        body: JSON.stringify(body)
+    });
+  }
+
+  function parseJsonContent(content) {
+    const trimmed = String(content || "").trim();
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const candidate = fenced ? fenced[1].trim() : trimmed;
+    return JSON.parse(candidate);
+  }
+
   async function getSettings() {
     const stored = await chrome.storage.local.get(["aelSettings"]);
     return { ...DEFAULT_SETTINGS, ...(stored.aelSettings || {}) };
   }
 })();
-
