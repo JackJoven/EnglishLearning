@@ -145,9 +145,12 @@ button:hover {
   background: #e6f4f1;
 }
 
+.wide {
+  grid-column: 1 / -1;
+}
+
 .status {
   min-height: 18px;
   margin-top: 10px;
   color: #0f766e;
 }
-

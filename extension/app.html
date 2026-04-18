@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI English Learning</title>
+    <link rel="stylesheet" href="src/app.css">
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand__mark">A</span>
+        <div>
+          <h1>语境英语</h1>
+          <p>把学过的词放回真实阅读里。</p>
+        </div>
+      </div>
+      <nav class="nav" aria-label="主要功能">
+        <button class="nav__item is-active" data-view="vocabulary" type="button">生词本</button>
+        <button class="nav__item" data-view="review" type="button">每日复习</button>
+        <button class="nav__item" data-view="rewrite" type="button">中文改写</button>
+        <button class="nav__item" data-view="settings" type="button">设置</button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <section class="view is-active" id="view-vocabulary" aria-labelledby="title-vocabulary">
+        <header class="section-head">
+          <div>
+            <h2 id="title-vocabulary">生词本</h2>
+            <p>从 hover 收藏来的词会出现在这里，可以筛选、改状态、删除或导出。</p>
+          </div>
+          <div class="toolbar">
+            <input id="vocabularySearch" type="search" placeholder="搜索单词、中文或例句">
+            <select id="masteryFilter" aria-label="掌握状态筛选">
+              <option value="all">全部状态</option>
+              <option value="new">陌生</option>
+              <option value="passive">被动认识</option>
+              <option value="familiar">半熟</option>
+              <option value="active">主动可用</option>
+              <option value="mastered">已掌握</option>
+            </select>
+          </div>
+        </header>
+        <div class="summary-grid">
+          <div><strong id="totalWords">0</strong><span>收藏词</span></div>
+          <div><strong id="activeWords">0</strong><span>主动可用</span></div>
+          <div><strong id="reviewRecords">0</strong><span>复习记录</span></div>
+        </div>
+        <div id="vocabularyList" class="list" aria-live="polite"></div>
+      </section>
+
+      <section class="view" id="view-review" aria-labelledby="title-review">
+        <header class="section-head">
+          <div>
+            <h2 id="title-review">每日复习</h2>
+            <p>每次挑 5 个词，优先练“用出来”，不是只看释义。</p>
+          </div>
+          <button id="startReview" class="primary" type="button">开始一轮复习</button>
+        </header>
+        <div id="reviewEmpty" class="empty">先在网页 hover 浮层里收藏几个词，再回来复习。</div>
+        <article id="reviewCard" class="review-card" hidden>
+          <div class="review-card__meta">
+            <span id="reviewProgress">1 / 5</span>
+            <span id="reviewTaskType">造句</span>
+          </div>
+          <h3 id="reviewTerm">term</h3>
+          <p id="reviewPrompt">prompt</p>
+          <textarea id="reviewAnswer" rows="5" placeholder="写下你的答案"></textarea>
+          <div class="button-row">
+            <button id="checkReview" class="primary" type="button">提交并反馈</button>
+            <button id="nextReview" type="button">下一个</button>
+          </div>
+          <div id="reviewFeedback" class="feedback" hidden></div>
+        </article>
+      </section>
+
+      <section class="view" id="view-rewrite" aria-labelledby="title-rewrite">
+        <header class="section-head">
+          <div>
+            <h2 id="title-rewrite">中文改写</h2>
+            <p>输入一句中文，优先尝试用你最近收藏的词表达出来。</p>
+          </div>
+        </header>
+        <div class="rewrite-panel">
+          <textarea id="rewriteInput" rows="6" placeholder="例如：我们需要优先处理这个登录问题。"></textarea>
+          <div class="button-row">
+            <button id="rewriteButton" class="primary" type="button">生成自然英文</button>
+            <button id="copyRewrite" type="button">复制推荐表达</button>
+          </div>
+          <div id="rewriteResults" class="rewrite-results"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-settings" aria-labelledby="title-settings">
+        <header class="section-head">
+          <div>
+            <h2 id="title-settings">设置</h2>
+            <p>控制替换强度、AI、网站黑名单和数据导出。</p>
+          </div>
+        </header>
+
+        <form id="settingsForm" class="settings-form">
+          <section class="settings-group">
+            <h3>网页替换</h3>
+            <label class="check-row">
+              <input id="settingEnabled" type="checkbox">
+              <span>开启网页语境替换</span>
+            </label>
+            <label>
+              替换方向
+              <select id="settingDirection">
+                <option value="both">双向替换</option>
+                <option value="zh-to-en">中文替换成英文</option>
+                <option value="en-to-zh">英文替换成中文</option>
+              </select>
+            </label>
+            <label>
+              替换强度
+              <select id="settingStrength">
+                <option value="low">低，每页最多 5 个</option>
+                <option value="medium">中，每页最多 10 个</option>
+                <option value="high">高，每页最多 18 个</option>
+              </select>
+            </label>
+            <label>
+              禁用网站，每行一个域名
+              <textarea id="disabledSites" rows="4" placeholder="mail.example.com&#10;bank.example.com"></textarea>
+            </label>
+          </section>
+
+          <section class="settings-group">
+            <h3>AI 接入</h3>
+            <label class="check-row">
+              <input id="aiEnabled" type="checkbox">
+              <span>启用 AI 替换、改写和复习反馈</span>
+            </label>
+            <label>
+              API Endpoint
+              <input id="aiEndpoint" type="url" placeholder="https://api.openai.com/v1/chat/completions">
+            </label>
+            <label>
+              Model
+              <input id="aiModel" type="text" placeholder="gpt-4o-mini">
+            </label>
+            <label>
+              API Key
+              <input id="apiKey" type="password" placeholder="sk-...">
+            </label>
+            <p class="hint">API key 只保存在浏览器本地存储里。开启 AI 后，插件会把有限的页面正文片段发送到你配置的接口。</p>
+          </section>
+
+          <section class="settings-group">
+            <h3>数据</h3>
+            <div class="button-row">
+              <button id="exportData" type="button">导出数据</button>
+              <button id="clearIgnored" type="button">清空忽略词</button>
+            </div>
+            <textarea id="exportOutput" rows="8" readonly placeholder="导出的 JSON 会出现在这里"></textarea>
+          </section>
+
+          <div class="button-row sticky-actions">
+            <button class="primary" type="submit">保存设置</button>
+            <span id="settingsStatus" class="status"></span>
+          </div>
+        </form>
+      </section>
+    </main>
+
+    <script src="src/dictionary.js"></script>
+    <script src="src/app.js"></script>
+  </body>
+</html>
+
