@@ -4,6 +4,7 @@
     enabled: true,
     direction: "both",
     strength: "low",
+    useBuiltinDictionary: true,
     disabledSites: [],
     aiEnabled: false,
     aiEndpoint: "https://api.openai.com/v1/chat/completions",
@@ -56,6 +57,7 @@
   const exportOutput = document.querySelector("#exportOutput");
   const clearIgnored = document.querySelector("#clearIgnored");
   const resetData = document.querySelector("#resetData");
+  const ignoredList = document.querySelector("#ignoredList");
   const settingsStatus = document.querySelector("#settingsStatus");
 
   initialize();
@@ -106,6 +108,20 @@
         delete state.vocabulary[id];
         await saveVocabulary();
       }
+
+      if (action === "ignore") {
+        state.ignoredIds = Array.from(new Set([...state.ignoredIds, id]));
+        await chrome.storage.local.set({ aelIgnoredIds: state.ignoredIds });
+        renderVocabulary();
+        renderIgnoredList();
+      }
+
+      if (action === "restore") {
+        state.ignoredIds = state.ignoredIds.filter((item) => item !== id);
+        await chrome.storage.local.set({ aelIgnoredIds: state.ignoredIds });
+        renderVocabulary();
+        renderIgnoredList();
+      }
     });
 
     vocabularyList.addEventListener("change", async (event) => {
@@ -153,7 +169,17 @@
     clearIgnored.addEventListener("click", async () => {
       state.ignoredIds = [];
       await chrome.storage.local.set({ aelIgnoredIds: [] });
+      renderIgnoredList();
       showSettingsStatus("已清空忽略词。");
+    });
+
+    ignoredList.addEventListener("click", async (event) => {
+      const id = event.target.dataset.restoreIgnored;
+      if (!id) return;
+      state.ignoredIds = state.ignoredIds.filter((item) => item !== id);
+      await chrome.storage.local.set({ aelIgnoredIds: state.ignoredIds });
+      renderIgnoredList();
+      showSettingsStatus("已恢复这个词的替换。");
     });
 
     resetData.addEventListener("click", async () => {
@@ -196,6 +222,7 @@
   function renderAll() {
     renderVocabulary();
     renderSettings();
+    renderIgnoredList();
     renderStats();
   }
 
@@ -229,6 +256,7 @@
 
   function renderVocabularyCard(item) {
     const mastery = getMastery(item);
+    const ignored = state.ignoredIds.includes(item.id);
     return `
       <article class="card" data-id="${escapeHtml(item.id)}">
         <div class="card__head">
@@ -250,10 +278,56 @@
           ${item.sourceTitle ? `<span class="tag">${escapeHtml(item.sourceTitle)}</span>` : ""}
         </div>
         <div class="button-row">
+          <button type="button" data-action="${ignored ? "restore" : "ignore"}">${ignored ? "恢复替换" : "不再替换"}</button>
           <button type="button" data-action="delete">删除</button>
         </div>
       </article>
     `;
+  }
+
+  function renderIgnoredList() {
+    if (!state.ignoredIds.length) {
+      ignoredList.innerHTML = `<div class="empty">还没有被忽略的词。</div>`;
+      return;
+    }
+
+    ignoredList.innerHTML = state.ignoredIds.map((id) => {
+      const label = getEntryLabel(id);
+      return `
+        <article class="card">
+          <div class="card__head">
+            <div>
+              <div class="term">${escapeHtml(label.title)}</div>
+              <div class="translation">${escapeHtml(label.subtitle)}</div>
+            </div>
+            <button type="button" data-restore-ignored="${escapeHtml(id)}">恢复替换</button>
+          </div>
+        </article>
+      `;
+    }).join("");
+  }
+
+  function getEntryLabel(id) {
+    const userItem = state.vocabulary[id];
+    if (userItem) {
+      return {
+        title: userItem.en || userItem.id,
+        subtitle: userItem.zh || "个人词库"
+      };
+    }
+
+    const builtin = dictionary.find((entry) => entry.id === id);
+    if (builtin) {
+      return {
+        title: builtin.en,
+        subtitle: builtin.zh
+      };
+    }
+
+    return {
+      title: id,
+      subtitle: "AI 临时词或旧记录"
+    };
   }
 
   function startReviewRound() {
@@ -418,7 +492,7 @@
   function rewriteLocally(text) {
     const used = [];
     let recommendation = text;
-    const entries = [...Object.values(state.vocabulary), ...dictionary];
+    const entries = getLocalRewriteEntries();
 
     entries.forEach((entry) => {
       if (!entry.zh || !entry.en) return;
@@ -441,6 +515,14 @@
     };
   }
 
+  function getLocalRewriteEntries() {
+    const entries = [...Object.values(state.vocabulary)];
+    if (state.settings.useBuiltinDictionary) {
+      entries.push(...dictionary);
+    }
+    return entries;
+  }
+
   function renderRewriteResult(result) {
     rewriteResults.innerHTML = `
       <article class="card">
@@ -461,6 +543,7 @@
 
   function renderSettings() {
     document.querySelector("#settingEnabled").checked = state.settings.enabled;
+    document.querySelector("#useBuiltinDictionary").checked = state.settings.useBuiltinDictionary;
     document.querySelector("#settingDirection").value = state.settings.direction;
     document.querySelector("#settingStrength").value = state.settings.strength;
     document.querySelector("#disabledSites").value = (state.settings.disabledSites || []).join("\n");
@@ -473,6 +556,7 @@
   function readSettingsForm() {
     return {
       enabled: document.querySelector("#settingEnabled").checked,
+      useBuiltinDictionary: document.querySelector("#useBuiltinDictionary").checked,
       direction: document.querySelector("#settingDirection").value,
       strength: document.querySelector("#settingStrength").value,
       disabledSites: document.querySelector("#disabledSites").value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean),

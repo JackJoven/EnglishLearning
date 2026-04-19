@@ -107,6 +107,11 @@
               <input id="settingEnabled" type="checkbox">
               <span>开启网页语境替换</span>
             </label>
+            <label class="check-row">
+              <input id="useBuiltinDictionary" type="checkbox">
+              <span>使用内置少量替换词库</span>
+            </label>
+            <p class="hint">关闭后，网页自动替换只使用你划词添加或收藏过的个人词库。</p>
             <label>
               替换方向
               <select id="settingDirection">
@@ -158,6 +163,12 @@
               <button id="resetData" class="danger" type="button">清空全部学习数据</button>
             </div>
             <textarea id="exportOutput" rows="8" readonly placeholder="导出的 JSON 会出现在这里"></textarea>
+          </section>
+
+          <section class="settings-group">
+            <h3>取消替换管理</h3>
+            <p class="hint">在 hover 浮层里点“忽略这个词”后，它会出现在这里。恢复后，这个词可以重新参与替换。</p>
+            <div id="ignoredList" class="list"></div>
           </section>
 
           <div class="button-row sticky-actions">

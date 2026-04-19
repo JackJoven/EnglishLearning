@@ -4,6 +4,7 @@
     enabled: true,
     direction: "both",
     strength: "low",
+    useBuiltinDictionary: true,
     disabledSites: [],
     aiEnabled: false,
     aiEndpoint: "https://api.openai.com/v1/chat/completions",
@@ -33,12 +34,16 @@
     "[contenteditable='true']",
     "[role='button']",
     ".ael-replacement",
-    ".ael-tooltip"
+    ".ael-tooltip",
+    ".ael-selection-card"
   ].join(",");
 
   let settings = { ...DEFAULT_SETTINGS };
   let ignoredIds = [];
+  let userVocabulary = {};
   let tooltip;
+  let selectionCard;
+  let selectionDraft = null;
   let hideTimer;
   let observer;
   let applying = false;
@@ -50,11 +55,13 @@
   initialize();
 
   async function initialize() {
-    const stored = await storageGet(["aelSettings", "aelIgnoredIds"]);
+    const stored = await storageGet(["aelSettings", "aelIgnoredIds", "aelVocabulary"]);
     settings = { ...DEFAULT_SETTINGS, ...(stored.aelSettings || {}) };
     ignoredIds = stored.aelIgnoredIds || [];
+    userVocabulary = stored.aelVocabulary || {};
 
     createTooltip();
+    createSelectionCard();
     bindDocumentEvents();
     bindMessages();
     bindStorageChanges();
@@ -83,6 +90,20 @@
       const target = event.target.closest(".ael-replacement");
       if (!target) return;
       scheduleTooltipHide();
+    });
+
+    document.addEventListener("mouseup", (event) => {
+      if (event.target.closest(".ael-selection-card, .ael-tooltip")) return;
+      window.setTimeout(showSelectionCardFromCurrentSelection, 0);
+    });
+
+    document.addEventListener("keyup", (event) => {
+      if (event.key === "Escape") {
+        hideSelectionCard();
+        hideTooltip();
+        return;
+      }
+      window.setTimeout(showSelectionCardFromCurrentSelection, 0);
     });
   }
 
@@ -134,6 +155,14 @@
       if (changes.aelIgnoredIds) {
         ignoredIds = changes.aelIgnoredIds.newValue || [];
         restoreIgnoredEntries();
+      }
+
+      if (changes.aelVocabulary) {
+        userVocabulary = changes.aelVocabulary.newValue || {};
+        restoreOriginalText();
+        if (isReplacementAllowed()) {
+          applyReplacements();
+        }
       }
     });
   }
@@ -211,11 +240,39 @@
   }
 
   function getReplacementEntries() {
-    return [...aiEntries, ...dictionary];
+    const userEntries = Object.values(userVocabulary).map(normalizeUserEntry).filter(Boolean);
+    const entries = [...userEntries];
+
+    if (settings.useBuiltinDictionary) {
+      entries.push(...aiEntries, ...dictionary);
+    }
+
+    return dedupeEntries(entries);
+  }
+
+  function normalizeUserEntry(entry) {
+    if (!entry || !entry.id || !entry.zh || !entry.en) return null;
+    return {
+      ...entry,
+      kind: "user",
+      zhExplanation: entry.explanation,
+      enExplanation: entry.explanation,
+      difficulty: entry.difficulty || "自定义"
+    };
+  }
+
+  function dedupeEntries(entries) {
+    const seen = new Set();
+    return entries.filter((entry) => {
+      if (!entry?.id || seen.has(entry.id)) return false;
+      seen.add(entry.id);
+      return true;
+    });
   }
 
   function findZhMatch(text, entry) {
     if (settings.direction === "en-to-zh") return null;
+    if (entry.kind === "user" && entry.direction === "en-to-zh") return null;
     const index = text.indexOf(entry.zh);
     if (index === -1) return null;
     return {
@@ -230,6 +287,7 @@
 
   function findEnMatch(text, entry) {
     if (settings.direction === "zh-to-en") return null;
+    if (entry.kind === "user" && entry.direction === "zh-to-en") return null;
     const pattern = new RegExp(`\\b${escapeRegExp(entry.en)}\\b`, "i");
     const match = text.match(pattern);
     if (!match) return null;
@@ -327,6 +385,209 @@
     document.documentElement.append(tooltip);
   }
 
+  function createSelectionCard() {
+    selectionCard = document.createElement("div");
+    selectionCard.className = "ael-selection-card";
+    selectionCard.hidden = true;
+    selectionCard.addEventListener("click", handleSelectionCardClick);
+    document.documentElement.append(selectionCard);
+  }
+
+  function showSelectionCardFromCurrentSelection() {
+    const selection = window.getSelection();
+    const selectedText = selection?.toString().trim().replace(/\s+/g, " ");
+
+    if (!selectedText || selectedText.length < 2 || selectedText.length > 80 || !selection.rangeCount) {
+      hideSelectionCard();
+      return;
+    }
+
+    const range = selection.getRangeAt(0);
+    const container = range.commonAncestorContainer.nodeType === Node.TEXT_NODE
+      ? range.commonAncestorContainer.parentElement
+      : range.commonAncestorContainer;
+
+    if (!container || container.closest?.(SKIP_SELECTOR)) {
+      hideSelectionCard();
+      return;
+    }
+
+    const rect = range.getBoundingClientRect();
+    if (!rect.width && !rect.height) {
+      hideSelectionCard();
+      return;
+    }
+
+    selectionDraft = createSelectionDraft(selectedText);
+    selectionCard.innerHTML = `
+      <div class="ael-selection-card__mini">
+        <strong>${escapeHtml(selectedText)}</strong>
+        <button type="button" data-selection-action="form">添加到词库</button>
+      </div>
+    `;
+    selectionCard.hidden = false;
+    positionSelectionCard(rect.left, rect.bottom + 8);
+  }
+
+  function createSelectionDraft(selectedText) {
+    const hasChinese = /[\u3400-\u9fff]/.test(selectedText);
+    return {
+      selectedText,
+      direction: hasChinese ? "zh-to-en" : "en-to-zh",
+      zh: hasChinese ? selectedText : "",
+      en: hasChinese ? "" : selectedText,
+      explanation: "",
+      example: ""
+    };
+  }
+
+  async function handleSelectionCardClick(event) {
+    const action = event.target.dataset.selectionAction;
+    if (!action || !selectionDraft) return;
+
+    if (action === "form") {
+      renderSelectionForm();
+      return;
+    }
+
+    if (action === "cancel") {
+      hideSelectionCard();
+      return;
+    }
+
+    if (action === "ai") {
+      await fillSelectionWithAi();
+      return;
+    }
+
+    if (action === "save") {
+      await saveSelectionDraft();
+    }
+  }
+
+  function renderSelectionForm(message = "") {
+    selectionCard.innerHTML = `
+      <div class="ael-selection-card__form">
+        <div class="ael-selection-card__title">添加到个人词库</div>
+        <label>英文表达<input data-field="en" type="text"></label>
+        <label>中文含义<input data-field="zh" type="text"></label>
+        <label>解释<textarea data-field="explanation" rows="3"></textarea></label>
+        <label>例句<input data-field="example" type="text"></label>
+        <label>默认方向
+          <select data-field="direction">
+            <option value="both">双向替换</option>
+            <option value="zh-to-en">中文出现时替换成英文</option>
+            <option value="en-to-zh">英文出现时替换成中文</option>
+          </select>
+        </label>
+        <div class="ael-selection-card__status">${escapeHtml(message)}</div>
+        <div class="ael-selection-card__actions">
+          <button type="button" data-selection-action="save">保存</button>
+          <button type="button" data-selection-action="ai">AI 补全</button>
+          <button type="button" data-selection-action="cancel">取消</button>
+        </div>
+      </div>
+    `;
+
+    setSelectionField("en", selectionDraft.en);
+    setSelectionField("zh", selectionDraft.zh);
+    setSelectionField("explanation", selectionDraft.explanation);
+    setSelectionField("example", selectionDraft.example);
+    setSelectionField("direction", selectionDraft.direction);
+  }
+
+  function setSelectionField(name, value) {
+    const field = selectionCard.querySelector(`[data-field="${name}"]`);
+    if (field) field.value = value || "";
+  }
+
+  function readSelectionForm() {
+    selectionDraft = {
+      ...selectionDraft,
+      en: selectionCard.querySelector('[data-field="en"]')?.value.trim() || "",
+      zh: selectionCard.querySelector('[data-field="zh"]')?.value.trim() || "",
+      explanation: selectionCard.querySelector('[data-field="explanation"]')?.value.trim() || "",
+      example: selectionCard.querySelector('[data-field="example"]')?.value.trim() || "",
+      direction: selectionCard.querySelector('[data-field="direction"]')?.value || "zh-to-en"
+    };
+  }
+
+  async function fillSelectionWithAi() {
+    readSelectionForm();
+
+    if (!settings.aiEnabled || !settings.apiKey) {
+      renderSelectionForm("先在设置里启用 AI 并填写 API Key。");
+      return;
+    }
+
+    renderSelectionForm("AI 正在补全...");
+    const response = await chrome.runtime.sendMessage({
+      type: "ael-ai-entry",
+      payload: {
+        selectedText: selectionDraft.selectedText,
+        direction: selectionDraft.direction,
+        context: collectVisibleTextSample().slice(0, 1000)
+      }
+    });
+
+    if (!response?.ok) {
+      renderSelectionForm(response?.reason || "AI 补全失败。");
+      return;
+    }
+
+    selectionDraft = {
+      ...selectionDraft,
+      ...response.data,
+      direction: response.data.direction || selectionDraft.direction
+    };
+    renderSelectionForm("已补全，可以调整后保存。");
+  }
+
+  async function saveSelectionDraft() {
+    readSelectionForm();
+
+    if (!selectionDraft.en || !selectionDraft.zh) {
+      renderSelectionForm("英文表达和中文含义都要填写。");
+      return;
+    }
+
+    const stored = await storageGet(["aelVocabulary"]);
+    const vocabulary = stored.aelVocabulary || {};
+    const id = `user-${hashText(`${selectionDraft.zh}-${selectionDraft.en}`)}`;
+
+    vocabulary[id] = {
+      id,
+      zh: selectionDraft.zh,
+      en: selectionDraft.en,
+      explanation: selectionDraft.explanation || "手动添加到个人词库的表达。",
+      example: selectionDraft.example,
+      masteryStatus: vocabulary[id]?.masteryStatus || "new",
+      direction: selectionDraft.direction,
+      source: "selection",
+      sourceUrl: location.href,
+      sourceTitle: document.title,
+      savedAt: vocabulary[id]?.savedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    await storageSet({ aelVocabulary: vocabulary });
+    userVocabulary = vocabulary;
+    hideSelectionCard();
+    restoreOriginalText();
+    applyReplacements();
+  }
+
+  function positionSelectionCard(left, top) {
+    const gap = 12;
+    selectionCard.style.left = `${Math.min(Math.max(gap, left), window.innerWidth - 280)}px`;
+    selectionCard.style.top = `${Math.min(Math.max(gap, top), window.innerHeight - 280)}px`;
+  }
+
+  function hideSelectionCard() {
+    if (selectionCard) selectionCard.hidden = true;
+    selectionDraft = null;
+  }
+
   function showTooltip(target, event) {
     const entry = getReplacementEntries().find((item) => item.id === target.dataset.aelEntryId);
     if (!entry) return;
@@ -341,7 +602,7 @@
 
   function renderTooltip(entry, target) {
     const direction = target.dataset.aelDirection;
-    const explanation = entry.kind === "ai" ? entry.explanation : direction === "zh-to-en" ? entry.zhExplanation : entry.enExplanation;
+    const explanation = getEntryExplanation(entry, direction);
     return `
       <div class="ael-tooltip__title">
         <span class="ael-tooltip__term">${escapeHtml(target.dataset.aelReplacement)}</span>
@@ -359,6 +620,14 @@
         <button type="button" data-action="ignore">忽略这个词</button>
       </div>
     `;
+  }
+
+  function getEntryExplanation(entry, direction) {
+    if (entry.kind === "ai" || entry.kind === "user") {
+      return entry.explanation || "你添加到个人词库的表达。";
+    }
+
+    return direction === "zh-to-en" ? entry.zhExplanation : entry.enExplanation;
   }
 
   function bindTooltipActions(entry, target) {
@@ -482,6 +751,7 @@
 
   async function requestAiReplacementSuggestions() {
     if (aiRequestInFlight || aiRequestedForPage) return;
+    if (!settings.useBuiltinDictionary) return;
     if (!isReplacementAllowed() || !settings.aiEnabled || !settings.apiKey) return;
 
     const text = collectVisibleTextSample();

@@ -2,7 +2,8 @@
   const DEFAULT_SETTINGS = {
     enabled: true,
     direction: "both",
-    strength: "low"
+    strength: "low",
+    useBuiltinDictionary: true
   };
 
   const enabledInput = document.querySelector("#enabled");
@@ -77,6 +78,7 @@
       enabled: enabledInput.checked,
       direction: directionInput.value,
       strength: strengthInput.value,
+      useBuiltinDictionary: currentSettings.useBuiltinDictionary !== false,
       disabledSites: currentSettings.disabledSites || [],
       aiEnabled: currentSettings.aiEnabled || false,
       aiEndpoint: currentSettings.aiEndpoint || "https://api.openai.com/v1/chat/completions",

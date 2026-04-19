@@ -93,3 +93,85 @@
   color: #ffffff;
 }
 
+.ael-selection-card {
+  position: fixed;
+  z-index: 2147483647;
+  width: min(300px, calc(100vw - 24px));
+  border: 1px solid rgba(18, 24, 32, 0.16);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #151b23;
+  box-shadow: 0 12px 28px rgba(18, 24, 32, 0.18);
+  font-family: Arial, "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.ael-selection-card[hidden] {
+  display: none;
+}
+
+.ael-selection-card__mini,
+.ael-selection-card__form {
+  padding: 12px;
+}
+
+.ael-selection-card__mini {
+  display: grid;
+  gap: 8px;
+}
+
+.ael-selection-card__title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.ael-selection-card label {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  color: #394150;
+  font-weight: 700;
+}
+
+.ael-selection-card input,
+.ael-selection-card select,
+.ael-selection-card textarea {
+  width: 100%;
+  border: 1px solid #c9d1d9;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #151b23;
+  font: inherit;
+  padding: 6px 8px;
+}
+
+.ael-selection-card__status {
+  min-height: 18px;
+  margin-top: 8px;
+  color: #0f766e;
+}
+
+.ael-selection-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ael-selection-card button {
+  border: 1px solid rgba(18, 24, 32, 0.16);
+  border-radius: 8px;
+  background: #ffffff;
+  color: #151b23;
+  cursor: pointer;
+  font: inherit;
+  padding: 5px 9px;
+}
+
+.ael-selection-card button[data-selection-action="save"],
+.ael-selection-card button[data-selection-action="form"] {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #ffffff;
+}

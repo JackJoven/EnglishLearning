@@ -3,6 +3,7 @@
     enabled: true,
     direction: "both",
     strength: "low",
+    useBuiltinDictionary: true,
     disabledSites: [],
     aiEnabled: false,
     aiEndpoint: "https://api.openai.com/v1/chat/completions",
@@ -29,6 +30,11 @@
 
     if (message.type === "ael-ai-review") {
       handleAiReview(message.payload).then(sendResponse);
+      return true;
+    }
+
+    if (message.type === "ael-ai-entry") {
+      handleAiEntry(message.payload).then(sendResponse);
       return true;
     }
 
@@ -103,6 +109,29 @@
       { role: "system", content: "Return strict JSON only." },
       { role: "user", content: prompt }
     ], "score");
+  }
+
+  async function handleAiEntry(payload) {
+    const settings = await getSettings();
+    if (!settings.aiEnabled || !settings.apiKey) {
+      return { ok: false, reason: "AI 未启用或缺少 API Key" };
+    }
+
+    const prompt = [
+      "你是英语学习词库助手。",
+      "用户划选了网页中的一个词或词组，请补全个人词库条目。",
+      "只返回 JSON，不要 Markdown。",
+      "JSON 格式：{\"zh\":\"中文含义\",\"en\":\"英文表达\",\"direction\":\"zh-to-en 或 en-to-zh\",\"explanation\":\"一句中文解释\",\"example\":\"一个自然英文例句\",\"difficulty\":\"A2/B1/B2/C1\"}",
+      `用户划选：${payload.selectedText || ""}`,
+      `默认方向：${payload.direction || "zh-to-en"}`,
+      "页面上下文：",
+      payload.context || ""
+    ].join("\n");
+
+    return callChatJson(settings, [
+      { role: "system", content: "Return strict JSON only." },
+      { role: "user", content: prompt }
+    ], "en");
   }
 
   async function callChatJson(settings, messages, requiredKey) {
