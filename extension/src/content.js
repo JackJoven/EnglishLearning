@@ -222,7 +222,7 @@
   }
 
   function findBestMatch(text) {
-    const candidates = getReplacementEntries().filter((entry) => !ignoredIds.includes(entry.id));
+    const candidates = getReplacementEntries().filter((entry) => !ignoredIds.includes(entry.id) && mightMatchText(text, entry));
     let bestMatch = null;
 
     for (const entry of candidates) {
@@ -237,6 +237,18 @@
     }
 
     return bestMatch;
+  }
+
+  function mightMatchText(text, entry) {
+    if (entry.kind === "ai") {
+      return entry.original && text.toLowerCase().includes(entry.original.toLowerCase());
+    }
+
+    if (settings.direction !== "en-to-zh" && entry.zh && text.includes(entry.zh)) {
+      return true;
+    }
+
+    return settings.direction !== "zh-to-en" && entry.en && text.toLowerCase().includes(entry.en.toLowerCase());
   }
 
   function getReplacementEntries() {

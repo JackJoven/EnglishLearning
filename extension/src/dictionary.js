@@ -1,5 +1,5 @@
 (function exposeDictionary() {
-  window.AEL_DICTIONARY = [
+  const starterDictionary = [
     {
       id: "improve-efficiency",
       zh: "提高效率",
@@ -109,5 +109,9 @@
       difficulty: "B1"
     }
   ];
-})();
 
+  window.AEL_DICTIONARY = [
+    ...starterDictionary,
+    ...(window.AEL_CET4_CORE || [])
+  ];
+})();

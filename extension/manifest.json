@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "AI English Learning MVP",
   "description": "Learn English naturally through lightweight contextual replacements on web pages.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "permissions": ["activeTab", "storage", "tabs"],
   "host_permissions": ["<all_urls>", "https://api.openai.com/*"],
   "background": {
@@ -16,7 +16,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/dictionary.js", "src/content.js"],
+      "js": ["src/cet4-core.js", "src/dictionary.js", "src/content.js"],
       "css": ["src/content.css"],
       "run_at": "document_idle"
     }
