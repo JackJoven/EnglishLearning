@@ -52,6 +52,12 @@
   white-space: nowrap;
 }
 
+.ael-tooltip__phonetic {
+  color: #6b5d00;
+  font-size: 13px;
+  margin: -2px 0 7px;
+}
+
 .ael-tooltip__row {
   margin: 6px 0;
 }

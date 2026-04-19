@@ -212,6 +212,12 @@ textarea {
   font-weight: 700;
 }
 
+.phonetic {
+  color: #6b5d00;
+  font-size: 14px;
+  margin-top: 3px;
+}
+
 .meta {
   color: #5e6a67;
   font-size: 13px;

@@ -269,6 +269,7 @@
       kind: "user",
       zhExplanation: entry.explanation,
       enExplanation: entry.explanation,
+      phonetic: entry.phonetic || "",
       difficulty: entry.difficulty || "自定义"
     };
   }
@@ -448,6 +449,7 @@
       direction: hasChinese ? "zh-to-en" : "en-to-zh",
       zh: hasChinese ? selectedText : "",
       en: hasChinese ? "" : selectedText,
+      phonetic: "",
       explanation: "",
       example: ""
     };
@@ -482,6 +484,7 @@
       <div class="ael-selection-card__form">
         <div class="ael-selection-card__title">添加到个人词库</div>
         <label>英文表达<input data-field="en" type="text"></label>
+        <label>音标<input data-field="phonetic" type="text" placeholder="/kənˈstreɪnt/"></label>
         <label>中文含义<input data-field="zh" type="text"></label>
         <label>解释<textarea data-field="explanation" rows="3"></textarea></label>
         <label>例句<input data-field="example" type="text"></label>
@@ -502,6 +505,7 @@
     `;
 
     setSelectionField("en", selectionDraft.en);
+    setSelectionField("phonetic", selectionDraft.phonetic);
     setSelectionField("zh", selectionDraft.zh);
     setSelectionField("explanation", selectionDraft.explanation);
     setSelectionField("example", selectionDraft.example);
@@ -517,6 +521,7 @@
     selectionDraft = {
       ...selectionDraft,
       en: selectionCard.querySelector('[data-field="en"]')?.value.trim() || "",
+      phonetic: selectionCard.querySelector('[data-field="phonetic"]')?.value.trim() || "",
       zh: selectionCard.querySelector('[data-field="zh"]')?.value.trim() || "",
       explanation: selectionCard.querySelector('[data-field="explanation"]')?.value.trim() || "",
       example: selectionCard.querySelector('[data-field="example"]')?.value.trim() || "",
@@ -571,6 +576,7 @@
       id,
       zh: selectionDraft.zh,
       en: selectionDraft.en,
+      phonetic: selectionDraft.phonetic,
       explanation: selectionDraft.explanation || "手动添加到个人词库的表达。",
       example: selectionDraft.example,
       masteryStatus: vocabulary[id]?.masteryStatus || "new",
@@ -615,11 +621,13 @@
   function renderTooltip(entry, target) {
     const direction = target.dataset.aelDirection;
     const explanation = getEntryExplanation(entry, direction);
+    const phonetic = getEntryPhonetic(entry);
     return `
       <div class="ael-tooltip__title">
         <span class="ael-tooltip__term">${escapeHtml(target.dataset.aelReplacement)}</span>
         <span class="ael-tooltip__tag">${escapeHtml(entry.difficulty || "AI")}</span>
       </div>
+      ${phonetic ? `<div class="ael-tooltip__phonetic">${escapeHtml(phonetic)}</div>` : ""}
       <div class="ael-tooltip__row">
         <span class="ael-tooltip__label">原文：</span>${escapeHtml(target.dataset.aelOriginal)}
       </div>
@@ -640,6 +648,10 @@
     }
 
     return direction === "zh-to-en" ? entry.zhExplanation : entry.enExplanation;
+  }
+
+  function getEntryPhonetic(entry) {
+    return entry.phonetic || "";
   }
 
   function bindTooltipActions(entry, target) {
@@ -696,6 +708,7 @@
       id: entry.id,
       zh: entry.zh || (target.dataset.aelDirection === "zh-to-en" ? target.dataset.aelOriginal : target.dataset.aelReplacement),
       en: entry.en || entry.term || (target.dataset.aelDirection === "zh-to-en" ? target.dataset.aelReplacement : target.dataset.aelOriginal),
+      phonetic: entry.phonetic || "",
       explanation: entry.kind === "ai" ? entry.explanation : entry.zhExplanation,
       example: entry.example,
       masteryStatus: vocabulary[entry.id]?.masteryStatus || "new",
@@ -810,6 +823,7 @@
       zh: direction === "zh-to-en" ? original : replacement,
       en: direction === "zh-to-en" ? replacement : original,
       term: item.term || replacement,
+      phonetic: item.phonetic || "",
       explanation: item.explanation || "AI 根据当前网页语境推荐的替换。",
       example: item.example || "",
       difficulty: item.difficulty || "AI"

@@ -276,11 +276,12 @@
   ];
 
   window.AEL_CET4_CORE = rawEntries.map((row) => {
-    const [en, zh, example] = row.split("|");
+    const [en, zh, example, phonetic = ""] = row.split("|");
     return {
       id: `cet4-${slug(en)}`,
       zh,
       en,
+      phonetic,
       zhExplanation: `${zh}；大学英语四级核心常用词。`,
       enExplanation: `CET-4 core word: ${zh}`,
       example,
@@ -293,4 +294,3 @@
     return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   }
 })();
-

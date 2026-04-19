@@ -239,7 +239,7 @@
     const items = Object.values(state.vocabulary)
       .filter((item) => status === "all" || getMastery(item) === status)
       .filter((item) => {
-        const haystack = [item.en, item.zh, item.example, item.explanation].join(" ").toLowerCase();
+        const haystack = [item.en, item.zh, item.phonetic, item.example, item.explanation].join(" ").toLowerCase();
         return !keyword || haystack.includes(keyword);
       })
       .sort((a, b) => (b.savedAt || "").localeCompare(a.savedAt || ""));
@@ -262,6 +262,7 @@
         <div class="card__head">
           <div>
             <div class="term">${escapeHtml(item.en || item.term || item.id)}</div>
+            ${item.phonetic ? `<div class="phonetic">${escapeHtml(item.phonetic)}</div>` : ""}
             <div class="translation">${escapeHtml(item.zh || "")}</div>
           </div>
           <select data-action="mastery" aria-label="掌握状态">
