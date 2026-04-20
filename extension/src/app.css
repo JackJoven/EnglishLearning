@@ -218,6 +218,10 @@ textarea {
   margin-top: 3px;
 }
 
+.phonetic.is-pending {
+  color: #7a6f42;
+}
+
 .meta {
   color: #5e6a67;
   font-size: 13px;

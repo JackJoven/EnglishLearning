@@ -38,6 +38,11 @@
       return true;
     }
 
+    if (message.type === "ael-phonetic-lookup") {
+      handlePhoneticLookup(message.payload).then(sendResponse);
+      return true;
+    }
+
     return false;
   });
 
@@ -132,6 +137,47 @@
       { role: "system", content: "Return strict JSON only." },
       { role: "user", content: prompt }
     ], "en");
+  }
+
+  async function handlePhoneticLookup(payload) {
+    const term = String(payload?.term || "").trim().toLowerCase();
+    if (!term || !/^[a-z][a-z-]*$/i.test(term)) {
+      return { ok: false, reason: "只支持英文单词音标查询" };
+    }
+
+    const cacheKey = `phonetic:${term}`;
+    const stored = await chrome.storage.local.get(["aelPhoneticCache"]);
+    const cache = stored.aelPhoneticCache || {};
+
+    if (cache[cacheKey]) {
+      return { ok: true, phonetic: cache[cacheKey], cached: true };
+    }
+
+    try {
+      const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(term)}`);
+      if (!response.ok) return { ok: false, reason: `音标查询失败：${response.status}` };
+
+      const entries = await response.json();
+      const phonetic = findPhonetic(entries);
+      if (!phonetic) return { ok: false, reason: "没有找到音标" };
+
+      cache[cacheKey] = phonetic;
+      await chrome.storage.local.set({ aelPhoneticCache: cache });
+      return { ok: true, phonetic, cached: false };
+    } catch (error) {
+      return { ok: false, reason: error.message || "音标查询失败" };
+    }
+  }
+
+  function findPhonetic(payload) {
+    const entries = Array.isArray(payload) ? payload : [];
+    for (const entry of entries) {
+      if (entry.phonetic) return entry.phonetic;
+      const phonetics = Array.isArray(entry.phonetics) ? entry.phonetics : [];
+      const found = phonetics.find((item) => item.text);
+      if (found?.text) return found.text;
+    }
+    return "";
   }
 
   async function callChatJson(settings, messages, requiredKey) {

@@ -37,10 +37,12 @@
     ".ael-tooltip",
     ".ael-selection-card"
   ].join(",");
+  const PHONETIC_PENDING_TEXT = "音标查询中...";
 
   let settings = { ...DEFAULT_SETTINGS };
   let ignoredIds = [];
   let userVocabulary = {};
+  const phoneticLookups = new Map();
   let tooltip;
   let selectionCard;
   let selectionDraft = null;
@@ -611,23 +613,26 @@
     if (!entry) return;
 
     cancelTooltipHide();
+    tooltip.dataset.aelEntryId = entry.id;
     tooltip.innerHTML = renderTooltip(entry, target);
     tooltip.hidden = false;
     positionTooltip(event.clientX, event.clientY);
     bindTooltipActions(entry, target);
     markHoverOpened(entry.id);
+    hydrateTooltipPhonetic(entry, target);
   }
 
   function renderTooltip(entry, target) {
     const direction = target.dataset.aelDirection;
     const explanation = getEntryExplanation(entry, direction);
     const phonetic = getEntryPhonetic(entry);
+    const lookupTerm = getEntryLookupTerm(entry, target);
     return `
       <div class="ael-tooltip__title">
         <span class="ael-tooltip__term">${escapeHtml(target.dataset.aelReplacement)}</span>
         <span class="ael-tooltip__tag">${escapeHtml(entry.difficulty || "AI")}</span>
       </div>
-      ${phonetic ? `<div class="ael-tooltip__phonetic">${escapeHtml(phonetic)}</div>` : ""}
+      ${phonetic || lookupTerm ? `<div class="ael-tooltip__phonetic${phonetic ? "" : " is-pending"}" data-ael-phonetic>${escapeHtml(phonetic || PHONETIC_PENDING_TEXT)}</div>` : ""}
       <div class="ael-tooltip__row">
         <span class="ael-tooltip__label">原文：</span>${escapeHtml(target.dataset.aelOriginal)}
       </div>
@@ -652,6 +657,59 @@
 
   function getEntryPhonetic(entry) {
     return entry.phonetic || "";
+  }
+
+  function getEntryLookupTerm(entry, target) {
+    const fallback = target.dataset.aelDirection === "zh-to-en"
+      ? target.dataset.aelReplacement
+      : target.dataset.aelOriginal;
+    return normalizePhoneticTerm(entry.en || entry.term || fallback);
+  }
+
+  async function hydrateTooltipPhonetic(entry, target) {
+    if (entry.phonetic) return;
+
+    const lookupTerm = getEntryLookupTerm(entry, target);
+    if (!lookupTerm) return;
+
+    const phonetic = await lookupPhonetic(lookupTerm);
+    if (!phonetic) {
+      const currentNode = tooltip?.dataset.aelEntryId === entry.id
+        ? tooltip.querySelector("[data-ael-phonetic]")
+        : null;
+      if (currentNode) currentNode.remove();
+      return;
+    }
+
+    entry.phonetic = phonetic;
+    if (userVocabulary[entry.id]) {
+      userVocabulary[entry.id].phonetic = phonetic;
+    }
+
+    if (tooltip?.dataset.aelEntryId !== entry.id || tooltip.hidden) return;
+    const currentNode = tooltip.querySelector("[data-ael-phonetic]");
+    if (!currentNode) return;
+    currentNode.textContent = phonetic;
+    currentNode.classList.remove("is-pending");
+  }
+
+  function lookupPhonetic(term) {
+    if (!term) return Promise.resolve("");
+    if (!phoneticLookups.has(term)) {
+      const lookup = chrome.runtime.sendMessage({
+        type: "ael-phonetic-lookup",
+        payload: { term }
+      }).then((response) => response?.ok ? response.phonetic || "" : "")
+        .catch(() => "");
+
+      phoneticLookups.set(term, lookup);
+    }
+    return phoneticLookups.get(term);
+  }
+
+  function normalizePhoneticTerm(value) {
+    const term = String(value || "").trim().toLowerCase();
+    return /^[a-z][a-z-]*$/i.test(term) ? term : "";
   }
 
   function bindTooltipActions(entry, target) {

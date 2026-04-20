@@ -18,6 +18,9 @@
     active: "主动可用",
     mastered: "已掌握"
   };
+  const PHONETIC_PENDING_TEXT = "音标查询中...";
+  const MAX_PHONETIC_LOOKUPS_PER_RENDER = 12;
+  const phoneticLookups = new Map();
 
   let state = {
     settings: { ...DEFAULT_SETTINGS },
@@ -252,17 +255,19 @@
 
     vocabularyList.innerHTML = items.map((item) => renderVocabularyCard(item)).join("");
     renderStats();
+    hydrateVocabularyPhonetics(items);
   }
 
   function renderVocabularyCard(item) {
     const mastery = getMastery(item);
     const ignored = state.ignoredIds.includes(item.id);
+    const lookupTerm = normalizePhoneticTerm(item.en || item.term);
     return `
       <article class="card" data-id="${escapeHtml(item.id)}">
         <div class="card__head">
           <div>
             <div class="term">${escapeHtml(item.en || item.term || item.id)}</div>
-            ${item.phonetic ? `<div class="phonetic">${escapeHtml(item.phonetic)}</div>` : ""}
+            ${item.phonetic || lookupTerm ? `<div class="phonetic${item.phonetic ? "" : " is-pending"}" data-phonetic>${escapeHtml(item.phonetic || PHONETIC_PENDING_TEXT)}</div>` : ""}
             <div class="translation">${escapeHtml(item.zh || "")}</div>
           </div>
           <select data-action="mastery" aria-label="掌握状态">
@@ -284,6 +289,73 @@
         </div>
       </article>
     `;
+  }
+
+  async function hydrateVocabularyPhonetics(items) {
+    const candidates = items
+      .filter((item) => !item.phonetic)
+      .map((item) => ({
+        id: item.id,
+        term: normalizePhoneticTerm(item.en || item.term)
+      }))
+      .filter((item) => item.id && item.term)
+      .slice(0, MAX_PHONETIC_LOOKUPS_PER_RENDER);
+
+    if (!candidates.length) return;
+
+    const results = await Promise.all(candidates.map(async (item) => ({
+      ...item,
+      phonetic: await lookupPhonetic(item.term)
+    })));
+
+    let changed = false;
+    results.forEach((item) => {
+      const storedItem = state.vocabulary[item.id];
+      const phoneticNode = findVocabularyPhoneticNode(item.id);
+
+      if (!item.phonetic) {
+        if (phoneticNode) phoneticNode.remove();
+        return;
+      }
+
+      if (!storedItem || storedItem.phonetic) return;
+      storedItem.phonetic = item.phonetic;
+      storedItem.updatedAt = new Date().toISOString();
+      changed = true;
+
+      if (!phoneticNode) return;
+      phoneticNode.textContent = item.phonetic;
+      phoneticNode.classList.remove("is-pending");
+    });
+
+    if (changed) {
+      await saveVocabulary(false);
+    }
+  }
+
+  function findVocabularyPhoneticNode(id) {
+    const card = Array.from(vocabularyList.querySelectorAll("[data-id]"))
+      .find((item) => item.dataset.id === id);
+    return card?.querySelector("[data-phonetic]") || null;
+  }
+
+  function lookupPhonetic(term) {
+    if (!term) return Promise.resolve("");
+    if (!phoneticLookups.has(term)) {
+      const lookup = chrome.runtime.sendMessage({
+        type: "ael-phonetic-lookup",
+        payload: { term }
+      }).then((response) => response?.ok ? response.phonetic || "" : "")
+        .catch(() => "");
+
+      phoneticLookups.set(term, lookup);
+    }
+    return phoneticLookups.get(term);
+  }
+
+  function normalizePhoneticTerm(value) {
+    const term = String(value || "").trim().toLowerCase();
+    return /^[a-z][a-z-]*$/i.test(term) ? term : "";
   }
 
   function renderIgnoredList() {

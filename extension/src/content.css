@@ -58,6 +58,10 @@
   margin: -2px 0 7px;
 }
 
+.ael-tooltip__phonetic.is-pending {
+  color: #7a6f42;
+}
+
 .ael-tooltip__row {
   margin: 6px 0;
 }
