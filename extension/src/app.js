@@ -60,6 +60,8 @@
   const exportOutput = document.querySelector("#exportOutput");
   const clearIgnored = document.querySelector("#clearIgnored");
   const resetData = document.querySelector("#resetData");
+  const testApi = document.querySelector("#testApi");
+  const apiTestStatus = document.querySelector("#apiTestStatus");
   const ignoredList = document.querySelector("#ignoredList");
   const settingsStatus = document.querySelector("#settingsStatus");
 
@@ -203,6 +205,8 @@
       renderAll();
       showSettingsStatus("学习数据已清空。");
     });
+
+    testApi.addEventListener("click", testAiConnection);
   }
 
   function routeFromHash() {
@@ -624,6 +628,7 @@
     document.querySelector("#aiEndpoint").value = state.settings.aiEndpoint;
     document.querySelector("#aiModel").value = state.settings.aiModel;
     document.querySelector("#apiKey").value = state.settings.apiKey;
+    showApiTestStatus("");
   }
 
   function readSettingsForm() {
@@ -669,6 +674,49 @@
     showSettingsStatus.timer = window.setTimeout(() => {
       settingsStatus.textContent = "";
     }, 2000);
+  }
+
+  async function testAiConnection() {
+    const settings = readSettingsForm();
+    if (!settings.aiEndpoint || !settings.aiModel || !settings.apiKey) {
+      showApiTestStatus("先填完整 API Endpoint、Model 和 API Key。", "error");
+      return;
+    }
+
+    testApi.disabled = true;
+    showApiTestStatus("正在测试连接...", "pending");
+
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: "ael-ai-test",
+        payload: {
+          aiEndpoint: settings.aiEndpoint,
+          aiModel: settings.aiModel,
+          apiKey: settings.apiKey
+        }
+      });
+
+      if (!response?.ok) {
+        showApiTestStatus(response?.reason || "测试失败。", "error");
+        return;
+      }
+
+      const latency = response.data?.latencyMs ? `${response.data.latencyMs}ms` : "已连通";
+      const preview = response.data?.preview ? `，返回：${response.data.preview}` : "";
+      showApiTestStatus(`连接成功，${latency}${preview}`, "success");
+    } catch (_error) {
+      showApiTestStatus("测试失败，请检查网络或接口配置。", "error");
+    } finally {
+      testApi.disabled = false;
+    }
+  }
+
+  function showApiTestStatus(message, tone = "") {
+    apiTestStatus.textContent = message;
+    apiTestStatus.className = "status";
+    if (tone) {
+      apiTestStatus.classList.add(`is-${tone}`);
+    }
   }
 
   function escapeHtml(value) {

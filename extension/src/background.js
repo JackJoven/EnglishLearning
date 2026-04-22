@@ -38,6 +38,11 @@
       return true;
     }
 
+    if (message.type === "ael-ai-test") {
+      handleAiTest(message.payload).then(sendResponse);
+      return true;
+    }
+
     if (message.type === "ael-phonetic-lookup") {
       handlePhoneticLookup(message.payload).then(sendResponse);
       return true;
@@ -139,6 +144,56 @@
     ], "en");
   }
 
+  async function handleAiTest(payload) {
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      aiEndpoint: String(payload?.aiEndpoint || "").trim() || DEFAULT_SETTINGS.aiEndpoint,
+      aiModel: String(payload?.aiModel || "").trim() || DEFAULT_SETTINGS.aiModel,
+      apiKey: String(payload?.apiKey || "").trim()
+    };
+
+    if (!settings.aiEndpoint) {
+      return { ok: false, reason: "缺少 API Endpoint" };
+    }
+
+    if (!settings.aiModel) {
+      return { ok: false, reason: "缺少 Model" };
+    }
+
+    if (!settings.apiKey) {
+      return { ok: false, reason: "缺少 API Key" };
+    }
+
+    const startedAt = Date.now();
+
+    try {
+      const response = await postChat(settings, [
+        { role: "system", content: "You are a connectivity check. Reply briefly." },
+        { role: "user", content: "Reply with PONG" }
+      ], false);
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        return { ok: false, reason: formatApiError(response.status, payload) };
+      }
+
+      const preview = String(payload.choices?.[0]?.message?.content || "").trim().replace(/\s+/g, " ").slice(0, 48);
+      if (!preview) {
+        return { ok: false, reason: "接口已连接，但没有返回可用内容" };
+      }
+
+      return {
+        ok: true,
+        data: {
+          latencyMs: Date.now() - startedAt,
+          preview
+        }
+      };
+    } catch (error) {
+      return { ok: false, reason: error.message || "接口测试失败" };
+    }
+  }
+
   async function handlePhoneticLookup(payload) {
     const term = String(payload?.term || "").trim().toLowerCase();
     if (!term || !/^[a-z][a-z-]*$/i.test(term)) {
@@ -233,6 +288,14 @@
     const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
     const candidate = fenced ? fenced[1].trim() : trimmed;
     return JSON.parse(candidate);
+  }
+
+  function formatApiError(status, payload) {
+    const detail = payload?.error?.message
+      || payload?.message
+      || payload?.detail
+      || "";
+    return detail ? `AI 请求失败：${status}，${detail}` : `AI 请求失败：${status}`;
   }
 
   async function getSettings() {

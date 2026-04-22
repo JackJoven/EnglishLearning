@@ -152,7 +152,12 @@
               API Key
               <input id="apiKey" type="password" placeholder="sk-...">
             </label>
-            <p class="hint">API key 只保存在浏览器本地存储里。开启 AI 后，插件会把有限的页面正文片段发送到你配置的接口。</p>
+            <p class="hint">API key 只保存在浏览器本地存储里。开启 AI 后，插件会在网页 AI 候选、中文改写、复习反馈、划词 AI 补全时调用你配置的接口。</p>
+            <div class="button-row">
+              <button id="testApi" type="button">测试 API 是否通畅</button>
+              <span id="apiTestStatus" class="status" aria-live="polite"></span>
+            </div>
+            <p class="hint">测试按钮会直接使用当前输入发起一次轻量请求，不需要先保存。</p>
           </section>
 
           <section class="settings-group">
