@@ -199,10 +199,8 @@
 
     for (const node of nodes) {
       if (count >= limit) break;
-      const match = findBestMatch(node.nodeValue);
-      if (!match) continue;
-      replaceTextNode(node, match);
-      count += 1;
+      const replacementsAdded = replaceTextNode(node, limit - count);
+      count += replacementsAdded;
     }
 
     applying = false;
@@ -344,17 +342,35 @@
     return first.index <= second.index ? first : second;
   }
 
-  function replaceTextNode(node, match) {
-    const fragment = document.createDocumentFragment();
-    const before = node.nodeValue.slice(0, match.index);
-    const after = node.nodeValue.slice(match.index + match.length);
+  function replaceTextNode(node, maxReplacements) {
+    const originalText = node.nodeValue;
+    if (!originalText || maxReplacements <= 0) return 0;
 
-    if (before) fragment.append(document.createTextNode(before));
-    fragment.append(createReplacementSpan(match));
-    if (after) fragment.append(document.createTextNode(after));
+    const fragment = document.createDocumentFragment();
+    let remainingText = originalText;
+    let replacementCount = 0;
+
+    while (replacementCount < maxReplacements) {
+      const match = findBestMatch(remainingText);
+      if (!match) break;
+
+      const before = remainingText.slice(0, match.index);
+      if (before) fragment.append(document.createTextNode(before));
+      fragment.append(createReplacementSpan(match));
+      recordExposure(match.entry.id);
+
+      remainingText = remainingText.slice(match.index + match.length);
+      replacementCount += 1;
+    }
+
+    if (!replacementCount) return 0;
+
+    if (remainingText) {
+      fragment.append(document.createTextNode(remainingText));
+    }
 
     node.replaceWith(fragment);
-    recordExposure(match.entry.id);
+    return replacementCount;
   }
 
   function createReplacementSpan(match) {
